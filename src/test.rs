@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     env::temp_dir,
-    fs::{create_dir, remove_dir_all},
+    fs::{create_dir, remove_dir_all, remove_file},
 };
 use uuid::Uuid;
 
@@ -238,7 +238,7 @@ impl Arbitrary for Cases {
     }
 }
 
-fn run_for_cases(cases: Cases) -> Result<(), E> {
+fn run_for_unpacked(cases: Cases) -> Result<(), E> {
     let storage_path = temp_dir().join(Uuid::new_v4().to_string());
     create_dir(&storage_path)?;
     let mut storage = BinStorage::open(&storage_path)?;
@@ -259,15 +259,46 @@ fn run_for_cases(cases: Cases) -> Result<(), E> {
     Ok(())
 }
 
+fn run_for_packed(cases: Cases) -> Result<(), E> {
+    let storage_path = temp_dir().join(Uuid::new_v4().to_string());
+    let bundle = temp_dir().join(Uuid::new_v4().to_string());
+    create_dir(&storage_path)?;
+    let mut storage = BinStorage::open(&storage_path)?;
+    let mut cleaned = HashMap::new();
+    cases.cases.into_iter().for_each(|(key, case)| {
+        cleaned.insert(key, case);
+    });
+    for (key, case) in cleaned.iter() {
+        storage.set(key, case)?;
+    }
+    storage.pack(&bundle)?;
+    drop(storage);
+    remove_dir_all(storage_path)?;
+    let storage = BinStorage::unpack(&bundle)?;
+    for (key, case) in cleaned.iter() {
+        let stored: Case = storage.get(key)?.unwrap();
+        assert_eq!(case, &stored);
+    }
+    remove_dir_all(storage.cwd())?;
+    remove_file(&bundle)?;
+    Ok(())
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
         max_shrink_iters: 5000,
         ..ProptestConfig::with_cases(100)
     })]
     #[test]
-    fn test_cases(
+    fn unpacked(
         args in any_with::<Cases>(())
     )  {
-        run_for_cases(args).unwrap();
+        run_for_unpacked(args).unwrap();
+    }
+    #[test]
+    fn packed(
+        args in any_with::<Cases>(())
+    )  {
+        run_for_packed(args).unwrap();
     }
 }
