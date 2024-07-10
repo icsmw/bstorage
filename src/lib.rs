@@ -1,4 +1,5 @@
 mod error;
+pub(crate) mod file;
 mod storage;
 
 pub use error::*;
