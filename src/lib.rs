@@ -1,5 +1,5 @@
 mod error;
-pub(crate) mod file;
+pub(crate) mod fs;
 mod storage;
 
 pub use error::*;

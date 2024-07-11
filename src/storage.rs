@@ -9,7 +9,7 @@ use std::{
 };
 use uuid::Uuid;
 
-use crate::{file, E};
+use crate::{fs, E};
 
 const MAP_FILE_NAME: &str = "map.bstorage";
 const STORAGE_FILE_EXT: &str = "bstorage";
@@ -26,13 +26,13 @@ pub struct BinStorage {
 impl BinStorage {
     pub fn open<P: AsRef<Path>>(cwd: P) -> Result<Self, E> {
         if !cwd.as_ref().exists() {
-            return Err(E::PathIsNotFolder(cwd.as_ref().to_path_buf()));
+            return Err(E::PathIsNotFolder(fs::as_path_buf(cwd)));
         }
-        let map = cwd.as_ref().to_path_buf().join(MAP_FILE_NAME);
+        let map = fs::as_path_buf(&cwd).join(MAP_FILE_NAME);
         if !map.exists() {
             debug!("Storage's map file will be created: {map:?}");
         }
-        let mut file = file::create_or_open(&map)?;
+        let mut file = fs::create_or_open(&map)?;
         let mut files: HashMap<String, PathBuf> = HashMap::new();
         if file.metadata()?.len() > 0 {
             let mut buffer = Vec::new();
@@ -51,12 +51,12 @@ impl BinStorage {
             map,
             bundle: None,
             files,
-            cwd: cwd.as_ref().to_path_buf(),
+            cwd: fs::as_path_buf(cwd),
         })
     }
 
     pub fn unpack<P: AsRef<Path>>(bundle: P) -> Result<Self, E> {
-        let bundle = bundle.as_ref().to_path_buf();
+        let bundle = fs::as_path_buf(bundle);
         if !bundle.exists() || !bundle.is_file() {
             return Err(E::PackageFileDoesNotExist(bundle));
         }
@@ -65,7 +65,7 @@ impl BinStorage {
         if !cwd.exists() {
             create_dir(&cwd)?;
         }
-        let mut file = file::read(&bundle)?;
+        let mut file = fs::read(&bundle)?;
         if bundle.metadata()?.len() < U64_SIZE as u64 {
             return Err(E::PackageFileInvalid(bundle));
         }
@@ -86,11 +86,11 @@ impl BinStorage {
             let mut buffer = vec![0; size];
             file.seek(SeekFrom::Start(from))?;
             file.read_exact(&mut buffer)?;
-            let mut record = file::create(cwd.join(&filename))?;
+            let mut record = fs::create(cwd.join(&filename))?;
             record.write_all(&buffer)?;
             map.insert(key, filename);
         }
-        let mut map_file = file::create(cwd.join(MAP_FILE_NAME))?;
+        let mut map_file = fs::create(cwd.join(MAP_FILE_NAME))?;
         let buffer = bincode::serialize(&map)?;
         map_file.write_all(&buffer)?;
         let mut storage = Self::open(cwd)?;
@@ -120,11 +120,11 @@ impl BinStorage {
             cursor += size;
         }
         let map = bincode::serialize(&location)?;
-        let mut bundle = file::create(bundle)?;
+        let mut bundle = fs::create(bundle)?;
         bundle.write_all(&cursor.to_le_bytes())?;
         for (_, filepath) in files.iter() {
             let mut buffer: Vec<u8> = Vec::new();
-            file::read(filepath)?.read_to_end(&mut buffer)?;
+            fs::read(filepath)?.read_to_end(&mut buffer)?;
             bundle.write_all(&buffer)?;
         }
         bundle.write_all(&map)?;
@@ -136,7 +136,7 @@ impl BinStorage {
             return Ok(None);
         };
         let mut buffer = Vec::new();
-        file::read(filename)?.read_to_end(&mut buffer)?;
+        fs::read(filename)?.read_to_end(&mut buffer)?;
         Ok(Some(bincode::deserialize::<V>(&buffer)?))
     }
 
@@ -158,7 +158,7 @@ impl BinStorage {
         let filename = self.files.get(key.as_ref()).unwrap_or(&filename).to_owned();
         self.files
             .insert(key.as_ref().to_owned(), filename.to_owned());
-        let mut file = file::create(filename)?;
+        let mut file = fs::create(filename)?;
         let buffer = bincode::serialize(&value)?;
         file.write_all(&buffer)?;
         self.write_map()
@@ -186,8 +186,38 @@ impl BinStorage {
             files.insert(key.to_owned(), filename.to_string_lossy().to_string());
         }
         let buffer = bincode::serialize(&files)?;
-        let mut map = file::create(&self.map)?;
+        let mut map = fs::create(&self.map)?;
         map.write_all(&buffer)?;
         Ok(())
+    }
+}
+
+pub struct BinStorageIter<'a> {
+    keys: Vec<&'a String>,
+    pos: usize,
+}
+
+impl<'a> Iterator for BinStorageIter<'a> {
+    type Item = &'a String;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.keys.len() {
+            None
+        } else {
+            self.pos += 1;
+            Some(self.keys[self.pos - 1])
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a BinStorage {
+    type Item = &'a String;
+    type IntoIter = BinStorageIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        BinStorageIter {
+            keys: self.files.keys().collect(),
+            pos: 0,
+        }
     }
 }
