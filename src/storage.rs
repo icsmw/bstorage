@@ -1,18 +1,14 @@
-use log::{debug, warn};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    io::{Read, Write},
     path::{Path, PathBuf},
 };
 
-use crate::{fs, Field, E};
-
-const MAP_FILE_NAME: &str = "map.bstorage";
+use crate::{fs, Field, Map, E};
 
 #[derive(Debug)]
 pub struct BinStorage {
-    pub(crate) map: PathBuf,
+    pub(crate) map: Map,
     pub(crate) bundle: Option<PathBuf>,
     pub(crate) cwd: PathBuf,
     pub(crate) fields: HashMap<String, Field>,
@@ -23,25 +19,8 @@ impl BinStorage {
         if !cwd.as_ref().exists() {
             return Err(E::PathIsNotFolder(fs::as_path_buf(cwd)));
         }
-        let map = fs::as_path_buf(&cwd).join(MAP_FILE_NAME);
-        if !map.exists() {
-            debug!("Storage's map file will be created: {map:?}");
-        }
-        let mut file = fs::create_or_open(&map)?;
-        let mut fields: HashMap<String, Field> = HashMap::new();
-        if file.metadata()?.len() > 0 {
-            let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer)?;
-            let decoded: HashMap<String, String> = bincode::deserialize(&buffer)?;
-            for (key, filename) in decoded.into_iter() {
-                let file_path = cwd.as_ref().join(&filename);
-                if !file_path.exists() {
-                    warn!("File \"{filename}\" for key \"{key}\" doesn't exist");
-                    continue;
-                }
-                fields.insert(key, Field::restore(&file_path));
-            }
-        }
+        let map = Map::new(&cwd);
+        let fields = map.read()?;
         Ok(Self {
             map,
             bundle: None,
@@ -83,7 +62,7 @@ impl BinStorage {
         };
         field.set::<V>(value)?;
         self.fields.insert(key.as_ref().to_owned(), field);
-        self.write_map()
+        self.map.write(&self.fields)
     }
 
     pub fn clear(&mut self) -> Result<(), E> {
@@ -91,23 +70,11 @@ impl BinStorage {
             field.remove()?;
         }
         self.fields.clear();
-        self.write_map()
+        self.map.write(&self.fields)
     }
 
     pub fn cwd(&self) -> &PathBuf {
         &self.cwd
-    }
-
-    fn write_map(&mut self) -> Result<(), E> {
-        let mut files: HashMap<String, String> = HashMap::new();
-        for (key, field) in self.fields.iter() {
-            let file_name = field.file_name()?;
-            files.insert(key.to_owned(), file_name);
-        }
-        let buffer = bincode::serialize(&files)?;
-        let mut map = fs::create(&self.map)?;
-        map.write_all(&buffer)?;
-        Ok(())
     }
 }
 
