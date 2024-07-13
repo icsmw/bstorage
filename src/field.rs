@@ -2,7 +2,7 @@ use crate::{fs, E};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::remove_file,
-    io::{Read, Seek, SeekFrom, Write},
+    io::{Read, Write},
     path::{Path, PathBuf},
 };
 use uuid::Uuid;
@@ -12,20 +12,18 @@ const STORAGE_FILE_EXT: &str = "bstorage";
 #[derive(Debug)]
 pub struct Field {
     path: PathBuf,
-    cwd: PathBuf,
 }
 
 impl Field {
-    pub fn restore<P: AsRef<Path>>(cwd: P, path: P) -> Self {
+    pub fn restore<P: AsRef<Path>>(path: P) -> Self {
         Self {
-            cwd: fs::as_path_buf(cwd),
             path: fs::as_path_buf(path),
         }
     }
     pub fn create<P: AsRef<Path>>(cwd: P) -> Self {
         let cwd = fs::as_path_buf(cwd);
         let path = cwd.join(format!("{}.{STORAGE_FILE_EXT}", Uuid::new_v4()));
-        Self { cwd, path }
+        Self { path }
     }
     pub fn get<V: for<'a> Deserialize<'a> + 'static>(&self) -> Result<Option<V>, E> {
         let mut buffer = Vec::new();

@@ -14,6 +14,7 @@ const MAP_FILE_NAME: &str = "map.bstorage";
 const UNPACKED_EXT: &str = "unpacked";
 const U64_SIZE: usize = mem::size_of::<u64>();
 
+#[derive(Debug)]
 pub struct BinStorage {
     map: PathBuf,
     bundle: Option<PathBuf>,
@@ -42,7 +43,7 @@ impl BinStorage {
                     warn!("File \"{filename}\" for key \"{key}\" doesn't exist");
                     continue;
                 }
-                fields.insert(key, Field::restore(cwd.as_ref(), &file_path));
+                fields.insert(key, Field::restore(&file_path));
             }
         }
         Ok(Self {
