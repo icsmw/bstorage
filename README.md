@@ -59,7 +59,7 @@ The strategy of storing each record in a separate file is driven by the need to 
 
 This is why `bstorage` creates a separate file for each record, allowing for the fastest possible updating of each record without the need to overwrite the entire storage.
 
-### How to transfer the storage
+## How to transfer the storage
 
 Transferring the storage can be done by copying the entire contents of the storage directory. However, in some situations, this can be quite inconvenient, especially if the data needs to be transferred over a network.
 
@@ -110,3 +110,7 @@ let recovered: MyRecord = storage
     .expect("Record exists");
 assert_eq!(my_record, recovered)
 ```
+
+## Contributing
+
+Contributions are welcome! Please read the short [Contributing Guide](CONTRIBUTING.md).
