@@ -33,8 +33,7 @@ impl Field {
     pub fn set<V: Serialize + 'static>(&self, value: &V) -> Result<(), E> {
         let mut file = fs::create(&self.path)?;
         let buffer = bincode::serialize(&value)?;
-        file.write_all(&buffer)?;
-        Ok(())
+        file.write_all(&buffer).map_err(|e| e.into())
     }
     pub fn extract(&self) -> Result<Vec<u8>, E> {
         let mut buffer: Vec<u8> = Vec::new();

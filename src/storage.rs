@@ -9,7 +9,6 @@ use crate::{fs, Field, Map, E};
 #[derive(Debug)]
 pub struct BinStorage {
     pub(crate) map: Map,
-    pub(crate) bundle: Option<PathBuf>,
     pub(crate) cwd: PathBuf,
     pub(crate) fields: HashMap<String, Field>,
 }
@@ -23,7 +22,6 @@ impl BinStorage {
         let fields = map.read()?;
         Ok(Self {
             map,
-            bundle: None,
             fields,
             cwd: fs::as_path_buf(cwd),
         })

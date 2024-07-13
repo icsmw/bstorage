@@ -7,9 +7,8 @@ use std::{
     path::Path,
 };
 
-use crate::{fs, BinStorage, Field, E};
+use crate::{fs, map, BinStorage, Field, E};
 
-const MAP_FILE_NAME: &str = "map.bstorage";
 const UNPACKED_EXT: &str = "unpacked";
 const U64_SIZE: usize = mem::size_of::<u64>();
 
@@ -54,12 +53,10 @@ impl Bundle for BinStorage {
             record.write_all(&buffer)?;
             map.insert(key, filename);
         }
-        let mut map_file = fs::create(cwd.join(MAP_FILE_NAME))?;
+        let mut map_file = fs::create(cwd.join(map::MAP_FILE_NAME))?;
         let buffer = bincode::serialize(&map)?;
         map_file.write_all(&buffer)?;
-        let mut storage = Self::open(cwd)?;
-        storage.bundle = Some(bundle);
-        Ok(storage)
+        Self::open(cwd)
     }
 
     fn pack<P: AsRef<Path>>(&mut self, bundle: P) -> Result<(), E> {

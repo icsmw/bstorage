@@ -7,7 +7,7 @@ use std::{
 
 use crate::{fs, Field, E};
 
-const MAP_FILE_NAME: &str = "map.bstorage";
+pub(crate) const MAP_FILE_NAME: &str = "map.bstorage";
 
 #[derive(Debug)]
 pub struct Map {
