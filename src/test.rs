@@ -1,4 +1,4 @@
-use crate::{BinStorage, Bundle, E};
+use crate::{Bundle, Storage, E};
 use ctor::ctor;
 use proptest::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -241,7 +241,7 @@ impl Arbitrary for Cases {
 fn run_for_unpacked(cases: Cases) -> Result<(), E> {
     let storage_path = temp_dir().join(Uuid::new_v4().to_string());
     create_dir(&storage_path)?;
-    let mut storage = BinStorage::open(&storage_path)?;
+    let mut storage = Storage::open(&storage_path)?;
     let mut cleaned = HashMap::new();
     cases.cases.into_iter().for_each(|(key, case)| {
         cleaned.insert(key, case);
@@ -250,7 +250,7 @@ fn run_for_unpacked(cases: Cases) -> Result<(), E> {
         storage.set(key, case)?;
     }
     drop(storage);
-    let storage = BinStorage::open(&storage_path)?;
+    let storage = Storage::open(&storage_path)?;
     for (key, case) in cleaned.iter() {
         let stored: Case = storage.get(key)?.unwrap();
         assert_eq!(case, &stored);
@@ -263,7 +263,7 @@ fn run_for_packed(cases: Cases) -> Result<(), E> {
     let storage_path = temp_dir().join(Uuid::new_v4().to_string());
     let bundle = temp_dir().join(Uuid::new_v4().to_string());
     create_dir(&storage_path)?;
-    let mut storage = BinStorage::open(&storage_path)?;
+    let mut storage = Storage::open(&storage_path)?;
     let mut cleaned = HashMap::new();
     cases.cases.into_iter().for_each(|(key, case)| {
         cleaned.insert(key, case);
@@ -274,7 +274,7 @@ fn run_for_packed(cases: Cases) -> Result<(), E> {
     storage.pack(&bundle)?;
     drop(storage);
     remove_dir_all(storage_path)?;
-    let storage = BinStorage::unpack(&bundle)?;
+    let storage = Storage::unpack(&bundle)?;
     for (key, case) in cleaned.iter() {
         let stored: Case = storage.get(key)?.unwrap();
         assert_eq!(case, &stored);

@@ -7,17 +7,102 @@ use std::{
     path::Path,
 };
 
-use crate::{fs, map, BinStorage, Field, E};
+use crate::{fs, map, Field, Storage, E};
 
+/// Default extention of bundle file
 const UNPACKED_EXT: &str = "unpacked";
 const U64_SIZE: usize = mem::size_of::<u64>();
 
+/// Transferring the storage can be done by copying the entire contents of the storage directory. However,
+/// in some situations, this can be quite inconvenient, especially if the data needs to be transferred over
+/// a network.
+///
+/// The `Bundle` trait helps to resolve this issue and provides methods for packing and unpacking the storage
+/// into/from a single file.
+///
+/// # Example
+/// ```rust
+/// use bstorage::{Bundle, Storage};
+/// use serde::{Deserialize, Serialize};
+/// use std::{
+///     env::temp_dir,
+///     fs::{remove_dir_all, remove_file},
+/// };
+/// use uuid::Uuid;
+///
+/// #[derive(Serialize, Deserialize, PartialEq, Debug)]
+/// pub struct MyRecord {
+///     field_a: String,
+///     field_b: Option<u8>,
+/// }
+///
+/// // Set storage path
+/// let storage_path = temp_dir().join(Uuid::new_v4().to_string());
+/// // Create storage or open existed one
+/// let mut storage = Storage::create(&storage_path).expect("Storage created");
+/// let my_record = MyRecord {
+///     field_a: "Hello World!".to_owned(),
+///     field_b: Some(255),
+/// };
+/// // Save record into storage
+/// storage
+///    .set("my_record", &my_record)
+///    .expect("Record is saved");
+/// // Pack storage into file
+/// let packed = temp_dir().join(Uuid::new_v4().to_string());
+/// storage.pack(&packed).expect("Storage packed");
+/// // Remove origin storage
+/// remove_dir_all(storage_path).expect("Origin storage has been removed");
+/// drop(storage);
+/// // Unpack storage
+/// let storage =
+///     Storage::unpack(&packed).expect("Storage unpacked");
+/// // Remove bundle file
+/// remove_file(packed).expect("Bundle file removed");
+/// // Read record from unpacked storage
+/// let recovered: MyRecord = storage
+///    .get("my_record")
+///    .expect("Record is read")
+///    .expect("Record exists");
+/// assert_eq!(my_record, recovered)
+/// ```
 pub trait Bundle {
-    fn unpack<P: AsRef<Path>>(bundle: P) -> Result<BinStorage, E>;
+    /// Unpacks the storage from the specified bundle file.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle` - A path reference to the bundle file.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Storage, E>` - Returns the unpacked `Storage` instance or an error.
+    fn unpack<P: AsRef<Path>>(bundle: P) -> Result<Storage, E>;
+
+    /// Packs the storage into the specified bundle file.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle` - A path reference to the bundle file.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), E>` - Returns Ok(()) if successful, or an error.
     fn pack<P: AsRef<Path>>(&mut self, bundle: P) -> Result<(), E>;
 }
 
-impl Bundle for BinStorage {
+impl Bundle for Storage {
+    /// Unpacks the storage from the specified bundle file.
+    ///
+    /// This method reads the bundle file, extracts individual records, and writes them
+    /// to the storage directory specified by changing the extension of the bundle file.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle` - A path reference to the bundle file.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Self, E>` - Returns the unpacked `Storage` instance or an error.
     fn unpack<P: AsRef<Path>>(bundle: P) -> Result<Self, E> {
         let bundle = fs::as_path_buf(bundle);
         if !bundle.exists() || !bundle.is_file() {
@@ -59,6 +144,17 @@ impl Bundle for BinStorage {
         Self::open(cwd)
     }
 
+    /// Packs the storage into the specified bundle file.
+    ///
+    /// This method serializes all records into a single file for easy transfer and storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `bundle` - A path reference to the bundle file.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), E>` - Returns Ok(()) if successful, or an error.
     fn pack<P: AsRef<Path>>(&mut self, bundle: P) -> Result<(), E> {
         let mut location: Vec<(String, String, u64, u64)> = Vec::new();
         let mut cursor = U64_SIZE as u64;
