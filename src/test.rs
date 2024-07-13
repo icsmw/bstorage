@@ -1,4 +1,4 @@
-use crate::{BinStorage, E};
+use crate::{BinStorage, Bundle, E};
 use ctor::ctor;
 use proptest::prelude::*;
 use serde::{Deserialize, Serialize};
