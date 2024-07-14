@@ -171,9 +171,9 @@ for b in b.iter() {
     storage.set(i.to_string(), b).unwrap();
     i += 1;
 }
-let found = storage.find(|v: &A| &a[0] == v).unwrap().expect("Record found");
+let (_key, found) = storage.find(|v: &A| &a[0] == v).unwrap().expect("Record found");
 assert_eq!(found, a[found.a as usize]);
-let found = storage.find(|v: &B| &b[0] == v).unwrap().expect("Record found");
+let (_key, found) = storage.find(|v: &B| &b[0] == v).unwrap().expect("Record found");
 assert_eq!(found, b[found.c as usize]);
 assert!(storage.find(|v: &A| v.a > 254).unwrap().is_none());
 storage.clear().unwrap();
@@ -240,12 +240,12 @@ for b in b.iter() {
 }
 let found = storage.filter(|v: &A| v.a < 2).unwrap();
 assert_eq!(found.len(), 2);
-for found in found.into_iter() {
+for (_key, found) in found.into_iter() {
     assert_eq!(found, a[found.a as usize]);
 }
 let found = storage.filter(|v: &B| v.c < 2).unwrap();
 assert_eq!(found.len(), 2);
-for found in found.into_iter() {
+for (_key, found) in found.into_iter() {
     assert_eq!(found, b[found.c as usize]);
 }
 assert_eq!(storage.filter(|v: &A| v.a > 254).unwrap().len(), 0);
