@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fs::create_dir,
+    fs::{create_dir, remove_dir_all},
     path::{Path, PathBuf},
 };
 
@@ -101,6 +101,13 @@ impl Storage {
 
     /// Retrieves a value associated with the specified key. Returns None of case of deserializing error.
     ///
+    /// # Note
+    ///
+    /// This function will not return an error if an attempt to deserialize the field fails, but it will
+    /// return None. Using this method is recommended in most cases. But if you need to make sure the data in the
+    /// field is correct, you might want to use the method `get_sensitive` instead `get`.  `get_sensitive` will
+    /// return an error if an attempt to deserialize the field fails.
+    ///
     /// # Arguments
     ///
     /// * `key` - A reference to the key as a string slice.
@@ -181,6 +188,9 @@ impl Storage {
         key: K,
         value: &V,
     ) -> Result<(), E> {
+        if !self.cwd().exists() {
+            return Err(E::PathIsNotFolder(fs::as_path_buf(self.cwd().clone())));
+        }
         let field = if let Some(field) = self.fields.remove(key.as_ref()) {
             field
         } else {
@@ -210,6 +220,25 @@ impl Storage {
         Ok(true)
     }
 
+    /// Returns a number of fields in storage
+    ///
+    /// # Returns
+    ///
+    /// * `usize` - number of fields in storage
+    pub fn len(&self) -> usize {
+        self.fields.len()
+    }
+
+    /// Returns true if storage doesn't have any fields
+    ///
+    /// # Returns
+    ///
+    /// * `true` - if no fields in a storage
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Clears all entries from the storage and removes bound files. This method will not remove a storage folder.
     ///
     /// # Returns
@@ -221,6 +250,21 @@ impl Storage {
         }
         self.fields.clear();
         self.map.write(&self.fields)
+    }
+
+    /// Remove all files and folder of this storage
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), E>` - Returns Ok(()) if successful, or an error.
+    pub fn destroy(&mut self) -> Result<(), E> {
+        if !self.cwd().exists() {
+            return Err(E::PathIsNotFolder(fs::as_path_buf(self.cwd().clone())));
+        }
+        self.fields.clear();
+        remove_dir_all(self.cwd())?;
+        self.cwd = PathBuf::new();
+        Ok(())
     }
 
     /// Returns the current working directory of the storage.
@@ -271,5 +315,53 @@ impl<'a> IntoIterator for &'a Storage {
             keys: self.fields.keys().collect(),
             pos: 0,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Storage, E};
+    use serde::{Deserialize, Serialize};
+    use std::env::temp_dir;
+    use uuid::Uuid;
+
+    #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+    struct A {
+        a: u8,
+        b: String,
+    }
+
+    #[test]
+    fn remove() -> Result<(), E> {
+        let storage_path = temp_dir().join(Uuid::new_v4().to_string());
+        let mut storage = Storage::create(&storage_path)?;
+        let a = [
+            A {
+                a: 0,
+                b: String::from("one"),
+            },
+            A {
+                a: 1,
+                b: String::from("two"),
+            },
+            A {
+                a: 2,
+                b: String::from("three"),
+            },
+        ];
+        for (i, a) in a.iter().enumerate() {
+            storage.set(i.to_string(), a)?;
+        }
+        for (i, a) in a.into_iter().enumerate() {
+            assert_eq!(storage.get::<A, String>(i.to_string())?, Some(a));
+        }
+        storage.remove("0")?;
+        assert!(storage.get::<A, &str>("0")?.is_none());
+        assert_eq!(storage.len(), 2);
+        storage.clear()?;
+        assert!(storage.is_empty());
+        storage.destroy()?;
+        assert!(!storage_path.exists());
+        Ok(())
     }
 }
