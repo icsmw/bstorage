@@ -99,7 +99,7 @@ impl Storage {
         })
     }
 
-    /// Retrieves a value associated with the specified key.
+    /// Retrieves a value associated with the specified key. Returns None of case of deserializing error.
     ///
     /// # Arguments
     ///
@@ -116,6 +116,25 @@ impl Storage {
             return Ok(None);
         };
         field.get::<V>()
+    }
+
+    /// Retrieves a value associated with the specified key.Returns error in case of case of deserializing error.
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - A reference to the key as a string slice.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Option<V>, E>` - Returns the value if found, or None if not found, or an error.
+    pub fn get_sensitive<V: for<'a> Deserialize<'a> + 'static, K: AsRef<str>>(
+        &self,
+        key: K,
+    ) -> Result<Option<V>, E> {
+        let Some(field) = self.fields.get(key.as_ref()) else {
+            return Ok(None);
+        };
+        field.get_sensitive::<V>()
     }
 
     /// Retrieves a value associated with the specified key, or returns a default value if the key does not exist.

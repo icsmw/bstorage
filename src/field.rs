@@ -45,7 +45,7 @@ impl Field {
         Self { path }
     }
 
-    /// Retrieves the value of the field.
+    /// Retrieves the value of the field. Returns None of case of deserializing error.
     ///
     /// # Arguments
     ///
@@ -55,6 +55,23 @@ impl Field {
     ///
     /// * `Result<Option<V>, E>` - Returns the deserialized value of the field or an error.
     pub fn get<V: for<'a> Deserialize<'a> + 'static>(&self) -> Result<Option<V>, E> {
+        let mut buffer = Vec::new();
+        fs::read(&self.path)?.read_to_end(&mut buffer)?;
+        bincode::deserialize::<V>(&buffer)
+            .map(|v| Some(v))
+            .or_else(|_| Ok(None))
+    }
+
+    /// Retrieves the value of the field. Returns error in case of case of deserializing error.
+    ///
+    /// # Arguments
+    ///
+    /// * None
+    ///
+    /// # Returns
+    ///
+    /// * `Result<Option<V>, E>` - Returns the deserialized value of the field or an error.
+    pub fn get_sensitive<V: for<'a> Deserialize<'a> + 'static>(&self) -> Result<Option<V>, E> {
         let mut buffer = Vec::new();
         fs::read(&self.path)?.read_to_end(&mut buffer)?;
         Ok(Some(bincode::deserialize::<V>(&buffer)?))
