@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    fs::{create_dir, remove_dir_all},
+    fs::{create_dir_all, remove_dir_all},
     path::{Path, PathBuf},
 };
 
@@ -72,7 +72,7 @@ impl Storage {
     /// ```
     pub fn create<P: AsRef<Path>>(cwd: P) -> Result<Self, E> {
         if !cwd.as_ref().exists() {
-            create_dir(&cwd)?;
+            create_dir_all(&cwd)?;
         }
         Storage::open(cwd)
     }

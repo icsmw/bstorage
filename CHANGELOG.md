@@ -1,3 +1,8 @@
+# 0.2.1
+
+## Fixes
+- Create a full chain of folders for storage.
+
 # 0.2.0
 
 ## Features
